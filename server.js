@@ -8,12 +8,15 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Serve static assets from dist
+// Serve static build files
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Fallback to index.html for SPA routing
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// Fallback route for SPA in Express 5
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    return res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+  }
+  next();
 });
 
 app.listen(PORT, '0.0.0.0', () => {
