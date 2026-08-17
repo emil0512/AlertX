@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
+    "start":"npm serve -s dist"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
