@@ -1,44 +1,109 @@
 import React, { useState } from 'react';
-import { UserCheck, Shield, KeyRound, Mail, Phone, Lock, X, Sparkles } from 'lucide-react';
+import { Shield, Mail, Lock, User, Phone, X, ShieldCheck, AlertTriangle } from 'lucide-react';
 
-export default function AuthModal({ isOpen, onClose, onLogin, currentUser }) {
+// Hardcoded admin credentials (for demo — in production use a real backend)
+const ADMIN_EMAIL = 'admin@alertx.org';
+const ADMIN_PASSWORD = 'admin123';
+
+// Simple in-memory user store (persisted to localStorage)
+function getRegisteredUsers() {
+  try {
+    return JSON.parse(localStorage.getItem('alertx_registered_users') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveRegisteredUsers(users) {
+  localStorage.setItem('alertx_registered_users', JSON.stringify(users));
+}
+
+export default function AuthModal({ isOpen, onClose, onLogin, currentUser, adminAccessDenied }) {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('Citizen');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const userObj = {
-      name: name || (isRegister ? 'Registered User' : email.split('@')[0] || 'User'),
-      email: email || 'user@alertx.org',
-      phone: phone || '+1 555-0199',
-      role: role
-    };
-    onLogin(userObj);
-    onClose();
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setName('');
+    setPhone('');
+    setError('');
+    setSuccess('');
   };
 
-  const handleQuickDemo = (demoRole) => {
-    if (demoRole === 'Citizen') {
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setError('');
+
+    // Admin check
+    if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       onLogin({
-        name: 'Elena Rostova',
-        email: 'elena.rostova@campus.edu',
-        phone: '+1 555-0192',
-        role: 'Citizen'
-      });
-    } else {
-      onLogin({
-        name: 'Captain Vance (Dispatch 05)',
-        email: 'vance@police.alertx.org',
+        name: 'Admin Dispatcher',
+        email: ADMIN_EMAIL,
         phone: '+1 555-911-00',
         role: 'Admin Dispatcher'
       });
+      resetForm();
+      onClose();
+      return;
     }
+
+    // Citizen login
+    const users = getRegisteredUsers();
+    const match = users.find(
+      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password
+    );
+
+    if (match) {
+      onLogin({ name: match.name, email: match.email, phone: match.phone, role: 'Citizen' });
+      resetForm();
+      onClose();
+    } else {
+      setError('Invalid email or password. Please try again.');
+    }
+  };
+
+  const handleRegister = (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!name.trim()) { setError('Full name is required.'); return; }
+    if (!email.trim()) { setError('Email is required.'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
+    // Block admin email from being registered
+    if (email.trim().toLowerCase() === ADMIN_EMAIL) {
+      setError('This email address is reserved.');
+      return;
+    }
+
+    const users = getRegisteredUsers();
+    const exists = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (exists) {
+      setError('An account with this email already exists. Please sign in.');
+      return;
+    }
+
+    const newUser = { name: name.trim(), email: email.trim().toLowerCase(), password, phone: phone.trim() || '' };
+    saveRegisteredUsers([...users, newUser]);
+
+    setSuccess('Account created! Signing you in...');
+    setTimeout(() => {
+      onLogin({ name: newUser.name, email: newUser.email, phone: newUser.phone, role: 'Citizen' });
+      resetForm();
+      onClose();
+    }, 900);
+  };
+
+  const handleSignOut = () => {
+    onLogin(null);
     onClose();
   };
 
@@ -52,112 +117,155 @@ export default function AuthModal({ isOpen, onClose, onLogin, currentUser }) {
           <X className="w-5 h-5" />
         </button>
 
+        {/* Admin access denied banner */}
+        {adminAccessDenied && !currentUser && (
+          <div className="mb-4 flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            Admin access only. Sign in with admin credentials to continue.
+          </div>
+        )}
+
+        {/* Header */}
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-3 border border-red-500/20">
             <Shield className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-bold font-heading text-white">
-            {currentUser ? 'User Account Details' : isRegister ? 'Register AlertX Account' : 'Sign In to AlertX'}
+            {currentUser ? 'Your Account' : isRegister ? 'Create AlertX Account' : 'Sign In to AlertX'}
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Access citizen emergency distress reports or dispatcher controls.
+            {currentUser ? `Logged in as ${currentUser.role}` : 'Emergency reporting & dispatch access'}
           </p>
         </div>
 
-        {/* Quick Demo Shortcuts */}
-        {!currentUser && (
-          <div className="mb-6 p-3 bg-slate-900/90 rounded-2xl border border-slate-800 space-y-2">
-            <div className="text-[11px] font-bold text-amber-400 font-mono uppercase flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5" /> Hackathon 1-Click Demo Logins
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('Citizen')}
-                className="px-3 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
-              >
-                Log as Citizen
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('Admin')}
-                className="px-3 py-2 rounded-xl text-xs font-bold bg-red-600/30 hover:bg-red-600/40 text-red-300 border border-red-500/40 transition"
-              >
-                Log as Admin
-              </button>
-            </div>
-          </div>
-        )}
-
+        {/* Logged-in view */}
         {currentUser ? (
-          <div className="space-y-4 text-left">
+          <div className="space-y-4">
             <div className="p-4 bg-slate-900 rounded-xl border border-slate-800 space-y-2 text-xs">
-              <div><span className="text-slate-400">Name:</span> <strong className="text-white">{currentUser.name}</strong></div>
-              <div><span className="text-slate-400">Email:</span> <strong className="text-white">{currentUser.email}</strong></div>
-              <div><span className="text-slate-400">Role:</span> <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 font-bold">{currentUser.role}</span></div>
+              <div className="flex items-center gap-2 text-slate-300">
+                <User className="w-4 h-4 text-slate-500" />
+                <span className="font-semibold text-white">{currentUser.name}</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-400">
+                <Mail className="w-4 h-4 text-slate-600" />
+                <span>{currentUser.email}</span>
+              </div>
+              <div className="mt-2">
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                  currentUser.role === 'Admin Dispatcher'
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                }`}>
+                  {currentUser.role}
+                </span>
+              </div>
             </div>
-
             <button
-              onClick={() => onLogin(null)}
+              onClick={handleSignOut}
               className="w-full py-3 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-red-400 border border-slate-700 transition"
             >
               Sign Out
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Elena Rostova"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
-                />
+          <form onSubmit={isRegister ? handleRegister : handleLogin} className="space-y-4">
+
+            {/* Error / Success banners */}
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-300">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                {error}
+              </div>
+            )}
+            {success && (
+              <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-xl text-xs text-green-300">
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                {success}
               </div>
             )}
 
+            {/* Register-only fields */}
+            {isRegister && (
+              <>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Your full name"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Phone (optional)</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+1 555-0000"
+                      className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Email */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="citizen@alertx.org"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
+                />
+              </div>
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
-              />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500"
+                />
+              </div>
+              {isRegister && (
+                <p className="text-[10px] text-slate-500 mt-1">Minimum 6 characters</p>
+              )}
             </div>
 
             <button
               type="submit"
               className="w-full py-3 rounded-xl font-bold text-xs bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/30 transition"
             >
-              {isRegister ? 'Create AlertX Account' : 'Sign In'}
+              {isRegister ? 'Create Account' : 'Sign In'}
             </button>
 
-            <div className="text-center pt-2">
+            <div className="text-center pt-1">
               <button
                 type="button"
-                onClick={() => setIsRegister(!isRegister)}
+                onClick={() => { setIsRegister(!isRegister); setError(''); setSuccess(''); }}
                 className="text-xs text-slate-400 hover:text-white underline"
               >
-                {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
+                {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Register"}
               </button>
             </div>
           </form>
