@@ -16,21 +16,29 @@ export default function App() {
   });
 
   const [activeRole, setActiveRole] = useState('citizen'); // 'citizen' | 'admin'
-  const [currentUser, setCurrentUser] = useState({
-    name: 'Elena Rostova',
-    email: 'elena@campus.edu',
-    phone: '+1 555-0192',
-    role: 'Citizen'
-  });
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [isSOSOpen, setIsSOSOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [isSketchModalOpen, setIsSketchModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  // Clear any persisted user session on mount — always start logged out
+  useEffect(() => {
+    localStorage.removeItem('alertx_user');
+  }, []);
+
   useEffect(() => {
     localStorage.setItem('alertx_reports', JSON.stringify(reports));
   }, [reports]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('alertx_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('alertx_user');
+    }
+  }, [currentUser]);
 
   const handleAddReport = (newReport) => {
     setReports(prev => [newReport, ...prev]);
