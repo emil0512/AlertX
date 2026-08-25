@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: alertx-deployment
+  name: alert-x
   labels:
-    app: alertx
-    app.kubernetes.io/name: alertx
+    app: alert-x
+    app.kubernetes.io/name: alert-x
     app.kubernetes.io/part-of: alertx-platform
     app.kubernetes.io/component: frontend-api
 spec:
@@ -18,32 +18,32 @@ spec:
       maxUnavailable: 0
   selector:
     matchLabels:
-      app: alertx
+      app: alert-x
   template:
     metadata:
       labels:
-        app: alertx
-        app.kubernetes.io/name: alertx
+        app: alert-x
+        app.kubernetes.io/name: alert-x
     spec:
       serviceAccountName: alertx-sa
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
       containers:
-        - name: alertx
-          image: ghcr.io/emil0512/alertx:latest
-          imagePullPolicy: IfNotPresent
+        - name: alert-x
+          image: image-registry.openshift-image-registry.svc:5000/emil0512-dev/alert-x:latest
+          imagePullPolicy: Always
           ports:
-            - name: http
+            - name: 8080-tcp
               containerPort: 8080
               protocol: TCP
           # Resource requests & limits (Prerequisite for HPA)
           resources:
             requests:
-              cpu: 100m
+              cpu: 50m
               memory: 128Mi
             limits:
-              cpu: 500m
+              cpu: 300m
               memory: 512Mi
           # Health Probes
           startupProbe:

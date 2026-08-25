@@ -3,12 +3,12 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: alertx-hpa
   labels:
-    app: alertx
+    app: alert-x
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: alertx-deployment
+    name: alert-x
   minReplicas: 2
   maxReplicas: 10
   metrics:
@@ -24,20 +24,3 @@ spec:
         target:
           type: Utilization
           averageUtilization: 80
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent
-          value: 100
-          periodSeconds: 15
-        - type: Pods
-          value: 2
-          periodSeconds: 15
-      selectPolicy: Max
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent
-          value: 25
-          periodSeconds: 60
