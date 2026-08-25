@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/part-of: alertx-platform
     app.kubernetes.io/component: frontend-api
 spec:
-  # High Availability: 2 replicas by default
+  # High Availability: 2 replicas for load distribution
   replicas: 2
   # Zero-Downtime Rolling Update Strategy
   strategy:
@@ -28,7 +28,6 @@ spec:
       serviceAccountName: alertx-sa
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1001
       containers:
         - name: alert-x
           image: image-registry.openshift-image-registry.svc:5000/emil0512-dev/alert-x:latest
@@ -75,11 +74,10 @@ spec:
                 name: alertx-config
             - secretRef:
                 name: alertx-secrets
-          # Persistent Storage Volume Mount
+          # Volume Mount
           volumeMounts:
             - name: alertx-storage
               mountPath: /app/data
       volumes:
         - name: alertx-storage
-          persistentVolumeClaim:
-            claimName: alertx-storage-pvc
+          emptyDir: {}
