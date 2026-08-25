@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: alertx-alert-rules
+  labels:
+    app: alertx
+    role: alert-rules
+    openshift.io/user-monitoring: "true"
+spec:
+  groups:
+    - name: alertx.rules
+      rules:
+        # Alert if any pod replica is down
+        - alert: AlertXPodUnavailable
+          expr: kube_deployment_status_replicas_available{deployment="alertx-deployment"} < 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "AlertX service has 0 available replicas"
+            description: "No healthy pods are running for AlertX deployment in namespace {{ $labels.namespace }}."
+
+        # Alert on high CPU usage (> 85% for 3 minutes)
+        - alert: AlertXHighCPUUsage
+          expr: sum(rate(container_cpu_usage_seconds_total{container="alertx"}[2m])) by (pod) > 0.85
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "AlertX pod CPU utilization exceeded 85%"
+            description: "Pod {{ $labels.pod }} is experiencing sustained high CPU load."
+
+        # Alert on high memory usage
+        - alert: AlertXHighMemoryUsage
+          expr: container_memory_working_set_bytes{container="alertx"} > 400000000
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "AlertX memory usage approaching limit (> 400MB)"
+            description: "Pod {{ $labels.pod }} is nearing memory resource limit."

@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertx-deployment
+  labels:
+    app: alertx
+    app.kubernetes.io/name: alertx
+    app.kubernetes.io/part-of: alertx-platform
+    app.kubernetes.io/component: frontend-api
+spec:
+  # High Availability: 2 replicas by default
+  replicas: 2
+  # Zero-Downtime Rolling Update Strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: alertx
+  template:
+    metadata:
+      labels:
+        app: alertx
+        app.kubernetes.io/name: alertx
+    spec:
+      serviceAccountName: alertx-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: alertx
+          image: ghcr.io/emil0512/alertx:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          # Resource requests & limits (Prerequisite for HPA)
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          # Health Probes
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          # Environment variables from ConfigMap and Secret
+          envFrom:
+            - configMapRef:
+                name: alertx-config
+            - secretRef:
+                name: alertx-secrets
+          # Persistent Storage Volume Mount
+          volumeMounts:
+            - name: alertx-storage
+              mountPath: /app/data
+      volumes:
+        - name: alertx-storage
+          persistentVolumeClaim:
+            claimName: alertx-storage-pvc

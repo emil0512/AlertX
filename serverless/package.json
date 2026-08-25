@@ -1,0 +1,9 @@
+{
+  "name": "alertx-serverless-dispatcher",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dispatcher-func.js",
+  "scripts": {
+    "start": "node dispatcher-func.js"
+  }
+}

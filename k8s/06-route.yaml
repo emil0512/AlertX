@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: alertx-route
+  labels:
+    app: alertx
+    app.kubernetes.io/name: alertx
+spec:
+  to:
+    kind: Service
+    name: alertx-service
+    weight: 100
+  port:
+    targetPort: http
+  # Security: TLS Edge Termination with HTTP -> HTTPS Redirect
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

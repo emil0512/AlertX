@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertx-network-policy
+  labels:
+    app: alertx
+spec:
+  podSelector:
+    matchLabels:
+      app: alertx
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # 1. Allow traffic from OpenShift Ingress Routers
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: ingress
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 2. Allow traffic from OpenShift Monitoring (Prometheus)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+    # 3. Allow intra-namespace traffic
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow outbound HTTPS/HTTP for external alert dispatch webhooks & APIs
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

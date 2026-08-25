@@ -1,0 +1,117 @@
+name: AlertX CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ── Stage 1: Continuous Integration (Lint & Build Test) ───────────────────
+  test-and-build:
+    name: Lint & Build Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Build Production Frontend
+        run: npm run build
+
+  # ── Stage 2: Container Image Build & Push ────────────────────────────────
+  build-and-push-container:
+    name: Build & Push Container Image
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Stage 3: Continuous Deployment to OpenShift ───────────────────────────
+  deploy-to-openshift:
+    name: Continuous Deployment (OpenShift)
+    needs: build-and-push-container
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: OpenShift Login (if credentials are provided)
+        uses: redhat-actions/oc-login@v1
+        continue-on-error: true
+        with:
+          openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
+          openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true
+          namespace: ${{ secrets.OPENSHIFT_NAMESPACE || 'emil0512-dev' }}
+
+      - name: Apply Kubernetes/OpenShift Manifests
+        continue-on-error: true
+        run: |
+          echo "Applying Kubernetes and OpenShift Manifests..."
+          oc apply -f k8s/01-namespace-rbac.yaml
+          oc apply -f k8s/02-configmap-secret.yaml
+          oc apply -f k8s/03-pvc.yaml
+          oc apply -f k8s/05-service.yaml
+          oc apply -f k8s/06-route.yaml
+          oc apply -f k8s/07-networkpolicy.yaml
+          oc apply -f k8s/08-hpa.yaml
+          oc apply -f k8s/04-deployment.yaml
+
+      - name: Verify Rolling Update Rollout Status
+        continue-on-error: true
+        run: |
+          echo "Verifying zero-downtime rolling update deployment..."
+          oc rollout status deployment/alertx-deployment --timeout=120s

@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertx-sa
+  labels:
+    app: alertx
+    app.kubernetes.io/name: alertx
+    app.kubernetes.io/part-of: alertx-platform
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: alertx-role
+  labels:
+    app: alertx
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alertx-rb
+  labels:
+    app: alertx
+subjects:
+  - kind: ServiceAccount
+    name: alertx-sa
+roleRef:
+  kind: Role
+  name: alertx-role
+  apiGroup: rbac.authorization.k8s.io

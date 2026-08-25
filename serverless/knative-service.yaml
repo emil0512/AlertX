@@ -1,0 +1,30 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: alertx-dispatcher
+  labels:
+    app: alertx
+    app.kubernetes.io/component: serverless-dispatcher
+spec:
+  template:
+    metadata:
+      annotations:
+        # Scale to zero when idle (True Serverless behavior)
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "100"
+    spec:
+      containers:
+        - image: ghcr.io/emil0512/alertx-dispatcher:latest
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          ports:
+            - containerPort: 8080
+          env:
+            - name: NODE_ENV
+              value: "production"
